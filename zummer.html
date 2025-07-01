@@ -1,0 +1,101 @@
+<!-- CÓDIGO COMPLETO AQUÍ -->
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Zummer - Demo</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <style>
+    html, body { margin:0; padding:0; height:100%; font-family: sans-serif; }
+    #mainMap, #overviewMap { height: 100%; }
+    #container { display: flex; height: 100vh; }
+    #left { flex: 3; position: relative; }
+    #right { flex: 1; position: relative; }
+    #overviewMap { height: 100%; border-left: 2px solid #ccc; }
+    #btnGuess {
+      position: absolute; bottom: 20px; left: 20px; z-index: 1000;
+      padding: 10px 20px; background: #007bff; color: white; border: none;
+      border-radius: 5px; cursor: pointer;
+    }
+    #resultBox {
+      position: absolute; top: 20px; left: 20px; z-index: 1000;
+      background: rgba(0,0,0,0.6); color: white; padding: 10px; border-radius: 5px;
+      display: none;
+    }
+  </style>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
+</head>
+<body>
+<div id="container">
+  <div id="left">
+    <div id="mainMap"></div>
+    <button id="btnGuess">Adivinar ubicación</button>
+    <div id="resultBox"></div>
+  </div>
+  <div id="right">
+    <div id="overviewMap"></div>
+  </div>
+</div>
+<script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
+<script>
+  const spainBounds = [[36.0, -9.5], [43.8, 3.3]];
+  const randomLat = 36 + Math.random() * (43.8 - 36);
+  const randomLng = -9.5 + Math.random() * (3.3 + 9.5);
+  const realPoint = [randomLat, randomLng];
+
+  let maxZoomReached = 18;
+
+  const mainMap = L.map('mainMap').setView(realPoint, 18);
+  const overviewMap = L.map('overviewMap').setView([40.0, -3.5], 6);
+
+  const tiles = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+  });
+
+  tiles.addTo(mainMap);
+  tiles.addTo(overviewMap);
+
+  mainMap.on('zoomend', () => {
+    const z = mainMap.getZoom();
+    if (z < maxZoomReached) maxZoomReached = z;
+  });
+
+  let playerGuessMarker = null;
+  let realMarker = null;
+  let line = null;
+
+  document.getElementById('btnGuess').onclick = () => {
+    alert("Haz clic en el mapa general (derecha) para marcar tu suposición.");
+    overviewMap.once('click', function(e) {
+      if (playerGuessMarker) overviewMap.removeLayer(playerGuessMarker);
+      if (realMarker) overviewMap.removeLayer(realMarker);
+      if (line) overviewMap.removeLayer(line);
+
+      playerGuessMarker = L.marker(e.latlng, {title: "Tu suposición"}).addTo(overviewMap);
+      realMarker = L.marker(realPoint, {title: "Ubicación real"}).addTo(overviewMap);
+      line = L.polyline([e.latlng, realPoint], {color: 'red'}).addTo(overviewMap);
+
+      const distance = haversine(e.latlng.lat, e.latlng.lng, realPoint[0], realPoint[1]);
+      const zoomPenalty = (18 - maxZoomReached) * 300;
+      const distPenalty = distance * 20;
+      const points = Math.max(0, 5000 - zoomPenalty - distPenalty);
+
+      const resultBox = document.getElementById('resultBox');
+      resultBox.innerHTML = `📍 Distancia: ${distance.toFixed(2)} km<br>🔍 Zoom máximo usado: ${maxZoomReached}<br>🏆 Puntos: ${Math.round(points)}`;
+      resultBox.style.display = "block";
+    });
+  };
+
+  function haversine(lat1, lon1, lat2, lon2) {
+    function toRad(x) { return x * Math.PI / 180; }
+    const R = 6371;
+    const dLat = toRad(lat2-lat1);
+    const dLon = toRad(lon2-lon1);
+    const a = Math.sin(dLat/2)**2 +
+              Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLon/2)**2;
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+    return R * c;
+  }
+</script>
+</body>
+</html>
